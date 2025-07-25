@@ -5,6 +5,14 @@
 
 <h3>Lista de Documentos</h3>
 
+<label for="filtroOrden">Ordenar por:</label>
+<select id="filtroOrden" class="form-select mb-3" @onchange="OnOrdenChanged">
+    <option value="codigoAsc">Código (Menor a Mayor)</option>
+    <option value="codigoDesc">Código (Mayor a Menor)</option>
+    <option value="descripcionAsc">Descripción (A - Z)</option>
+    <option value="descripcionDesc">Descripción (Z - A)</option>
+</select>
+
 @if (documentos == null)
 {
     <p><em>Cargando...</em></p>
@@ -34,9 +42,31 @@ else
 
 @code {
     private List<Documento>? documentos;
+    private string ordenActual = "codigoAsc";
 
     protected override async Task OnInitializedAsync()
     {
         documentos = await DocumentoService.ObtenerDocumentosAsync();
+        OrdenarDocumentos(); // Aplica orden inicial
+    }
+
+    private void OnOrdenChanged(ChangeEventArgs e)
+    {
+        ordenActual = e.Value?.ToString() ?? "codigoAsc";
+        OrdenarDocumentos();
+    }
+
+    private void OrdenarDocumentos()
+    {
+        if (documentos == null) return;
+
+        documentos = ordenActual switch
+        {
+            "codigoAsc" => documentos.OrderBy(d => d.Codigo).ToList(),
+            "codigoDesc" => documentos.OrderByDescending(d => d.Codigo).ToList(),
+            "descripcionAsc" => documentos.OrderBy(d => d.Descripcion).ToList(),
+            "descripcionDesc" => documentos.OrderByDescending(d => d.Descripcion).ToList(),
+            _ => documentos
+        };
     }
 }
