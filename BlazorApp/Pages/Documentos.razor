@@ -2,16 +2,27 @@
 @using BlazorApp.Models
 @using BlazorApp.Services
 @inject DocumentoService DocumentoService
+@inject IJSRuntime JS 
 
 <h3>Lista de Documentos</h3>
 
-<label for="filtroOrden">Ordenar por:</label>
-<select id="filtroOrden" class="form-select mb-3" @onchange="OnOrdenChanged">
-    <option value="codigoAsc">Código (Menor a Mayor)</option>
-    <option value="codigoDesc">Código (Mayor a Menor)</option>
-    <option value="descripcionAsc">Descripción (A - Z)</option>
-    <option value="descripcionDesc">Descripción (Z - A)</option>
-</select>
+<div class="mb-3 d-flex align-items-end gap-3">
+    <div>
+        <label for="filtroOrden" class="form-label">Ordenar por:</label>
+        <select id="filtroOrden" class="form-select" @onchange="OnOrdenChanged">
+            <option value="codigoAsc">Código (Menor a Mayor)</option>
+            <option value="codigoDesc">Código (Mayor a Menor)</option>
+            <option value="descripcionAsc">Descripción (A - Z)</option>
+            <option value="descripcionDesc">Descripción (Z - A)</option>
+        </select>
+    </div>
+    <div>
+        <label class="form-label invisible">.</label>
+        <button class="btn btn-primary" @onclick="RefrescarDocumentos">
+            🔄 Refrescar
+        </button>
+    </div>
+</div>
 
 @if (documentos == null)
 {
@@ -46,8 +57,26 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await CargarDocumentosAsync();
+    }
+
+    private async Task CargarDocumentosAsync()
+    {
         documentos = await DocumentoService.ObtenerDocumentosAsync();
-        OrdenarDocumentos(); // Aplica orden inicial
+        OrdenarDocumentos();
+    }
+
+    private async Task RefrescarDocumentos()
+    {
+        try
+        {
+            await CargarDocumentosAsync();
+            await JS.InvokeVoidAsync("alert", "✅ Datos actualizados correctamente.");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"❌ Error al actualizar los documentos: {ex.Message}");
+        }
     }
 
     private void OnOrdenChanged(ChangeEventArgs e)
