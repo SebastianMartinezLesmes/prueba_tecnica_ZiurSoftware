@@ -2,31 +2,64 @@
 @using BlazorApp.Models
 @using BlazorApp.Services
 @inject DocumentoService DocumentoService
-@inject IJSRuntime JS 
 
-<h3>Lista de Documentos</h3>
-
-<div class="mb-3 d-flex align-items-end gap-3">
-    <div>
-        <label for="filtroOrden" class="form-label">Ordenar por:</label>
-        <select id="filtroOrden" class="form-select" @onchange="OnOrdenChanged">
-            <option value="codigoAsc">Código (Menor a Mayor)</option>
-            <option value="codigoDesc">Código (Mayor a Menor)</option>
-            <option value="descripcionAsc">Descripción (A - Z)</option>
-            <option value="descripcionDesc">Descripción (Z - A)</option>
-        </select>
+<!-- Modal Bootstrap -->
+@if (!string.IsNullOrEmpty(mensajeModal))
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Información</h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>@mensajeModal</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CerrarModal">Cerrar</button>
+                </div>
+            </div>
+        </div>
     </div>
-    <div>
-        <label class="form-label invisible">.</label>
-        <button class="btn btn-primary" @onclick="RefrescarDocumentos">
-            🔄 Refrescar
-        </button>
+}
+
+<div class="sticky-header mb-3 border-bottom">
+    <h3 class="mb-3">Lista de Documentos</h3>
+    <div class="d-flex flex-wrap align-items-end gap-3">
+        <div>
+            <label for="filtroOrden" class="form-label">Ordenar por:</label>
+            <select id="filtroOrden" class="form-select" @onchange="OnOrdenChanged">
+                <option value="codigoAsc">Código (Menor a Mayor)</option>
+                <option value="codigoDesc">Código (Mayor a Menor)</option>
+                <option value="descripcionAsc">Descripción (A - Z)</option>
+                <option value="descripcionDesc">Descripción (Z - A)</option>
+            </select>
+        </div>
+        <div>
+            <label for="filtroEstado" class="form-label">Estado:</label>
+            <select id="filtroEstado" class="form-select" @onchange="OnEstadoChanged">
+                <option value="todos">Todos</option>
+                <option value="activos">Activos</option>
+                <option value="inactivos">Inactivos</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label invisible">.</label>
+            <button class="btn btn-primary" @onclick="RefrescarDocumentos">
+                🔄 Refrescar
+            </button>
+        </div>
     </div>
 </div>
 
-@if (documentos == null)
+@if (documentosFiltrados == null)
 {
     <p><em>Cargando...</em></p>
+}
+else if (documentosFiltrados.Count == 0)
+{
+    <p><em>No hay documentos que coincidan con el filtro.</em></p>
 }
 else
 {
@@ -39,7 +72,7 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var doc in documentos)
+            @foreach (var doc in documentosFiltrados)
             {
                 <tr>
                     <td>@doc.Codigo</td>
@@ -53,7 +86,10 @@ else
 
 @code {
     private List<Documento>? documentos;
+    private List<Documento>? documentosFiltrados;
     private string ordenActual = "codigoAsc";
+    private string estadoFiltro = "todos";
+    private string? mensajeModal;
 
     protected override async Task OnInitializedAsync()
     {
@@ -63,7 +99,34 @@ else
     private async Task CargarDocumentosAsync()
     {
         documentos = await DocumentoService.ObtenerDocumentosAsync();
-        OrdenarDocumentos();
+        AplicarFiltrosYOrden();
+    }
+
+    private void AplicarFiltrosYOrden()
+    {
+        if (documentos == null) return;
+
+        IEnumerable<Documento> filtrados = documentos;
+
+        // Filtro por estado
+        filtrados = estadoFiltro switch
+        {
+            "activos" => filtrados.Where(d => d.VActiva),
+            "inactivos" => filtrados.Where(d => !d.VActiva),
+            _ => filtrados
+        };
+
+        // Ordenamiento
+        filtrados = ordenActual switch
+        {
+            "codigoAsc" => filtrados.OrderBy(d => d.Codigo),
+            "codigoDesc" => filtrados.OrderByDescending(d => d.Codigo),
+            "descripcionAsc" => filtrados.OrderBy(d => d.Descripcion),
+            "descripcionDesc" => filtrados.OrderByDescending(d => d.Descripcion),
+            _ => filtrados
+        };
+
+        documentosFiltrados = filtrados.ToList();
     }
 
     private async Task RefrescarDocumentos()
@@ -71,31 +134,28 @@ else
         try
         {
             await CargarDocumentosAsync();
-            await JS.InvokeVoidAsync("alert", "✅ Datos actualizados correctamente.");
+            mensajeModal = "✅ Datos actualizados correctamente.";
         }
         catch (Exception ex)
         {
-            await JS.InvokeVoidAsync("alert", $"❌ Error al actualizar los documentos: {ex.Message}");
+            mensajeModal = $"❌ Error al actualizar los documentos: {ex.Message}";
         }
     }
 
     private void OnOrdenChanged(ChangeEventArgs e)
     {
         ordenActual = e.Value?.ToString() ?? "codigoAsc";
-        OrdenarDocumentos();
+        AplicarFiltrosYOrden();
     }
 
-    private void OrdenarDocumentos()
+    private void OnEstadoChanged(ChangeEventArgs e)
     {
-        if (documentos == null) return;
+        estadoFiltro = e.Value?.ToString() ?? "todos";
+        AplicarFiltrosYOrden();
+    }
 
-        documentos = ordenActual switch
-        {
-            "codigoAsc" => documentos.OrderBy(d => d.Codigo).ToList(),
-            "codigoDesc" => documentos.OrderByDescending(d => d.Codigo).ToList(),
-            "descripcionAsc" => documentos.OrderBy(d => d.Descripcion).ToList(),
-            "descripcionDesc" => documentos.OrderByDescending(d => d.Descripcion).ToList(),
-            _ => documentos
-        };
+    private void CerrarModal()
+    {
+        mensajeModal = null;
     }
 }
